@@ -6,6 +6,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from src.gecm import dicts
 
 
 def config_describe(config_file):
@@ -130,17 +131,129 @@ def parse_mgmt_decisions(
 
     # Concatenate and tidy management decisions
     df_all = pd.concat(sheet_dict.values(), keys=sheet_dict.keys())
-    df_all.index = df_all.index.set_names(["player", "round"])
+    df_all.index = df_all.index.set_names(["Player", "Round"])
     df_all = df_all.reset_index()
-    df_all["round"] = pd.to_numeric(
-        df_all["round"], errors="coerce", downcast="integer"
+    df_all["Round"] = pd.to_numeric(
+        df_all["Round"], errors="coerce", downcast="integer"
     )
 
     # Unstack data: based on
     # https://stackoverflow.com/questions/25386870/pandas-plotting-with-multi-index
-    df_final = df_all.set_index(["round", "player"]).sort_index()
+    df_final = df_all.set_index(["Round", "Player"]).sort_index()
 
     if unstack_data:
-        return df_final.unstack(level="player")
+        return df_final.unstack(level="Player")
     else:
         return df_final
+
+
+def parse_sheets(
+    spreadsheet_id,
+    sheets,
+    credentials_fpath,
+    scopes,
+    to_numeric=False,
+    errors="ignore",
+    downcast="integer",
+):
+
+    sheet_dict = {}
+
+    # fetch data via gdrive api
+    for i, sheet_name in enumerate(sheets):
+
+        # 1) fetch data
+        data_dict = get_google_sheet(
+            credentials=credentials_fpath,
+            spreadsheet_id=spreadsheet_id,
+            range_name=sheet_name,
+            scopes=scopes,
+        )
+
+        # 2) convert to data frame
+        df_raw = gsheet2df(data_dict, header=0)
+
+        # 3) convert to numeric
+        if to_numeric:
+            df = df_raw.copy()
+            for col in df.columns:
+                df[col] = pd.to_numeric(
+                    df[col], errors=errors, downcast=downcast
+                )
+        else:
+            df = df_raw
+
+        # 4) append to dict
+        sheet_dict[sheet_name] = df
+
+    return sheet_dict
+
+
+def parse_all_mgmt_decisions(config_file, credentials_fpath):
+    # initialise container
+    dict_of_mgmt_decisions_dfs = {}
+
+    # iteratively parse sheets of all through stakeholder groups
+    for stakeholder_group in ["farmers", "foresters", "tourism"]:
+        dict_of_mgmt_decisions_dfs[stakeholder_group] = parse_mgmt_decisions(
+            spreadsheet_id=config_file.get(
+                section="gdrive_spreadsheet_ids",
+                option="spreadsheet_id_{}".format(stakeholder_group),
+            ),
+            sheets=parse_list(
+                config_string=config_file.get(
+                    section="gdrive_sheet_names",
+                    option="sheet_names_{}".format(stakeholder_group),
+                )
+            ),
+            credentials_fpath=credentials_fpath,  # API credentials
+            scopes=[config_file.get(section="default", option="scopes")],
+            # If modifying these scopes, delete the file "token.pickle".
+            unstack_data=False,
+        )
+
+    # combine
+    df_mgmt_decisions = pd.concat(
+        dict_of_mgmt_decisions_dfs.values(),
+        keys=dict_of_mgmt_decisions_dfs.keys(),
+    )
+    df_mgmt_decisions.index.rename("Stakeholder", level=0, inplace=True)
+    df_mgmt_decisions_long = df_mgmt_decisions.reset_index()
+    df_mgmt_decisions_long["id"] = df_mgmt_decisions_long.index.values
+
+    # capitalize column var names
+    df_mgmt_decisions_long.columns = df_mgmt_decisions_long.columns.str.title()
+
+    # melt data set
+    id_vars = ["Stakeholder", "Round", "Player", "Plot", "Teamwork"]
+    value_vars = [
+        "Sheep Farming",
+        "Cattle Farming",
+        "Native Forest",
+        "Commercial Forest",
+    ]
+    value_vars = list(dicts.simplified_lulc_mapping.keys())
+
+    df_out = df_mgmt_decisions_long.melt(
+        id_vars=id_vars,
+        value_vars=value_vars,
+        var_name="lulc_category",
+        value_name="mgmt_decision",
+    )
+
+    # clean select columns
+    df_out.loc[:, "Plot"] = df_out.loc[:, "Plot"].fillna(0).astype("int8")
+    df_out.loc[:, "Teamwork"] = (
+        df_out.loc[:, "Teamwork"].fillna(False).astype("bool")
+    )
+
+    # add id for lulc categories
+    df_out["lulc_category_id"] = [
+        dicts.simplified_lulc_mapping[k] for k in df_out["lulc_category"].values
+    ]
+
+    return df_out
+
+
+if __name__ == "__main__":
+    pass

@@ -1,3 +1,4 @@
+import seaborn as sns
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
@@ -49,5 +50,62 @@ def show_mgmt_decisions(
 
     # aggregate decisions per stakeholder group are bounded by [-100, +100] %
     ax.set_ylim(-100, 100)
-
     return ax
+
+
+def show_all_mgmt_decisions(df_mgmt_decisions_long):
+
+    # https://seaborn.pydata.org/tutorial/relational.html: seaborn supports semantics of hue, size, and style
+    g = sns.catplot(
+        x="Round",
+        y="mgmt_decision",
+        hue="lulc_category",
+        col="Stakeholder",
+        kind="bar",
+        data=df_mgmt_decisions_long,
+        saturation=0.5,
+        ci=None,
+        aspect=0.6,
+    )
+
+    (
+        g.set_axis_labels("Round", "Management Decision (%)")
+        # .set_xticklabels(["round", "round", "round"])
+        # .set_titles("{col_name} {col_var}")
+        .set(ylim=(-100, 100)).despine(left=False)
+    )
+
+    return g
+
+
+def create_dummy_gridspec():
+    """
+    Testing purposes.
+
+    Returns
+    -------
+
+    """
+    from matplotlib.gridspec import GridSpec
+
+    def format_axes(fig):
+        for i, ax in enumerate(fig.axes):
+            ax.text(0.5, 0.5, "ax%d" % (i + 1), va="center", ha="center")
+            ax.tick_params(labelbottom=False, labelleft=False)
+
+    fig = plt.figure(constrained_layout=True)
+
+    gs = GridSpec(4, 3, figure=fig)
+    ax1 = plt.subplot(gs.new_subplotspec((0, 0), colspan=2, rowspan=4))
+    ax2 = plt.subplot(gs.new_subplotspec((0, 2), colspan=1, rowspan=2))
+    ax3 = plt.subplot(gs.new_subplotspec((2, 2), colspan=1, rowspan=2))
+
+    fig.suptitle("GridSpec")
+    format_axes(fig)
+
+    plt.show()
+
+
+if __name__ == "__main__":
+    create_dummy_gridspec()
+    plt.show()

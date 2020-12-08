@@ -55,9 +55,44 @@ lulc_remapping = {
 }
 
 # colormap source: https://colorbrewer2.org/#type=qualitative&scheme=Paired&n=5
+# the entry for cattle farming (4) needs to stay in the last position (!!!)
 simplified_lulc_mapping_colors = {
     1: "#fee090",
     2: "#33a02c",
     3: "#b2df8a",
-    # 4: "#fdbf6f"
+    4: "#fdbf6f",
+}
+
+stakeholder_id_dict = {
+    "Farmer_1": 100,
+    "Farmer_2": 110,
+    "Forester_1": 120,
+    "Forester_2": 130,
+    "SSDA": 150,
+}
+
+stakeholder_property_dict = {
+    100: [11, 12, 21, 22],
+    110: [33, 34, 43, 44],
+    120: [13, 14, 23, 24],
+    130: [31, 32, 41, 42],
+}
+
+# https://colorbrewer2.org/#type=diverging&scheme=BrBG&n=5
+stakeholder_color_dict = {
+    100: "#878787",
+    110: "#1a1a1a",
+    120: "#35978f",
+    130: "#01665e",
+}
+
+# visual property allocation in quadrants of spatial map
+x_margin = 0.08
+y_margin = 0.03
+
+stakeholder_name_pos_dict = {
+    "Farmer 1": (x_margin, 1 - y_margin),
+    "Forester 1": (1 - x_margin, 1 - y_margin),
+    "Forester 2": (x_margin, y_margin),
+    "Farmer 2": (1 - x_margin, y_margin),
 }
